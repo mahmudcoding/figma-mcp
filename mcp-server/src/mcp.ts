@@ -5,13 +5,17 @@ import {
   CommandSchemas,
   McpToolName,
   type McpToolName as McpToolNameType,
+  type PluginCommand as PluginCommandType,
   toStructuredError
 } from "@custom-figma-mcp/shared";
-import type { CommandDispatcher } from "./dispatcher.js";
 
 interface ToolMetadata {
   title: string;
   description: string;
+}
+
+interface CommandExecutor {
+  execute(command: PluginCommandType, payload: unknown): Promise<unknown>;
 }
 
 const TOOL_METADATA: Record<McpToolNameType, ToolMetadata> = {
@@ -133,7 +137,7 @@ function zodShape(schema: ZodObject<ZodRawShape>): ZodRawShape {
   return schema.shape;
 }
 
-export async function startMcpServer(dispatcher: CommandDispatcher): Promise<void> {
+export async function startMcpServer(dispatcher: CommandExecutor): Promise<void> {
   const server = new McpServer({
     name: "custom-figma-mcp",
     version: "0.1.0"

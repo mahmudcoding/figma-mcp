@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type http from "node:http";
+import type { Duplex } from "node:stream";
 import { WebSocketServer, WebSocket } from "ws";
 import type { Logger } from "pino";
 import {
@@ -33,13 +34,19 @@ export class FigmaWebSocketHub {
   private readonly pending = new Map<string, PendingRequest>();
 
   public constructor(
-    server: http.Server,
     private readonly config: AppConfig,
     private readonly logger: Logger
   ) {
-    this.wss = new WebSocketServer({ server, path: "/ws/plugin" });
+    this.wss = new WebSocketServer({ noServer: true });
     this.wss.on("connection", (socket) => this.handleConnection(socket));
+    this.wss.on("error", (error) => this.logger.error({ error }, "Figma plugin WebSocket server failed"));
     this.heartbeatMonitor = setInterval(() => this.terminateStaleConnection(), HEARTBEAT_SWEEP_MS);
+  }
+
+  public handleUpgrade(request: http.IncomingMessage, socket: Duplex, head: Buffer): void {
+    this.wss.handleUpgrade(request, socket, head, (client) => {
+      this.wss.emit("connection", client, request);
+    });
   }
 
   public isConnected(): boolean {
