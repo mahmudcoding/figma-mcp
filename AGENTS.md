@@ -1,189 +1,131 @@
-# Agent Instructions
+# AGENTS.md
 
 ## Identity
 
-This repository implements a custom local Figma MCP system.
+This repository implements a custom local Figma MCP system for live desktop editing.
 
-Architecture:
+Supported architecture:
 
 ```text
-AI agent
-  <-> custom local MCP server
-  <-> custom Figma Desktop plugin
+Codex / Claude Code
+  <-> MCP
+Custom Local MCP Server
+  <-> WebSocket
+Custom Figma Desktop Plugin
   <-> Figma Plugin API
-  <-> current open Figma file
+Current open Figma Desktop file
 ```
-
-This is not the hosted or official Figma MCP workflow.
 
 ## Absolute Rules
 
-For normal Figma editing, never use:
+Never assume or use:
 
-- hosted Figma connectors
 - official Figma MCP
-- file keys
-- Figma design URLs
-- browser URL extraction
-- browser-based Figma workflows
-- REST
+- hosted connector
+- browser workflow
+- fileKey workflow for editing
+- Figma design URL workflow
+- Figma web app integration
+- REST for normal editing
+- OAuth
+- Client ID
+- Client Secret
+- external fetch of Figma files
 
-REST is allowed only for comments, versions/history, external file fetches, and remote team/library resources.
+Normal editing must use only:
 
-## Production Workflow
+- the custom local MCP server in this repo
+- the custom Figma Desktop plugin
+- local WebSocket transport
+- Figma Plugin API
+- the current live open Figma Desktop file
 
-Fresh setup:
+## Correct Workflow
 
-```bash
-./install.sh
-pnpm start
+Before any Figma task:
+
+1. Verify the server process exists or start it with `./run.sh`.
+2. Verify `http://localhost:3333/health`.
+3. Verify `pluginConnected=true`.
+4. Use custom MCP tools exposed by this repo.
+5. Operate on the current open desktop file.
+
+## Blockers
+
+The only valid blocker for normal editing is:
+
+```text
+pluginConnected=false
 ```
 
-Health check:
+Then instruct the user:
 
-```bash
-curl http://127.0.0.1:3333/health
+```text
+Open Figma Desktop.
+Open the target file.
+Run Plugins -> Development -> Custom Figma MCP Bridge.
 ```
 
-The plugin auto-configures from:
+Do not ask for file keys, design URLs, browser tabs, remote credentials, or external Figma access for normal editing.
+
+## Architecture
+
+The MCP server is a local stdio process launched by Codex or Claude Code. It also runs an HTTP/WebSocket server on `localhost:3333`.
+
+The plugin loads local config from:
 
 ```text
 http://localhost:3333/plugin/config
 ```
 
-The user should import and run:
+The plugin connects to:
 
 ```text
-Plugins -> Development -> Custom Figma MCP Bridge
+ws://localhost:3333/ws/plugin
 ```
 
-Manual WebSocket URL and token entry are diagnostics-only. Do not ask the user to paste a token unless auto-configuration is failing and you are actively debugging that failure.
+The plugin receives MCP commands over WebSocket, executes them through the Figma Plugin API, and returns structured results to the MCP server.
 
-## Correct Figma Task Workflow
-
-Before any Figma operation:
-
-1. Verify a current server is running on `127.0.0.1:3333`.
-2. Verify `/health` returns `ok: true`.
-3. Verify `pluginConnected: true`.
-4. Use only the custom local MCP tools from this repository.
-5. Operate on the current open Figma Desktop file.
-
-Useful checks:
+## Important Commands
 
 ```bash
-curl http://127.0.0.1:3333/health
-curl http://127.0.0.1:3333/status
-pnpm run doctor
-```
-
-## Only Valid Blocker
-
-The only valid blocker for normal editing is:
-
-```text
-pluginConnected: false
-```
-
-Tell the user:
-
-```text
-Open Figma Desktop, open the target file, and run:
-Plugins -> Development -> Custom Figma MCP Bridge
-```
-
-Do not ask for a file URL, file key, browser tab, or REST auth.
-
-## Commands
-
-Install:
-
-```bash
-./install.sh
-```
-
-Build:
-
-```bash
+./run.sh
+./run.sh --check
+pnpm install
 pnpm build
-```
-
-Start human-friendly local server:
-
-```bash
-pnpm start
-```
-
-Run the MCP server directly for an MCP client:
-
-```bash
-node mcp-server/dist/index.js
-```
-
-Diagnose setup:
-
-```bash
-pnpm run doctor
-```
-
-Plugin manifest info:
-
-```bash
-pnpm run plugin:info
-```
-
-Integration tests:
-
-```bash
+pnpm typecheck
+pnpm doctor
 pnpm test:integration
+pnpm plugin:build
 ```
 
 ## Debugging
 
-Connection stability:
-
-- `/health` shows `pluginConnected` and `lastPluginHeartbeat`.
-- `/plugin/config` provides loopback-only plugin auto-configuration.
-- The plugin reconnects automatically after server restarts.
-- Server-side heartbeat cleanup terminates stale plugin sockets.
-- A newer valid plugin socket replaces the old socket.
-
-Port ownership:
+Health:
 
 ```bash
-lsof -nP -iTCP:3333 -sTCP:LISTEN
+curl http://localhost:3333/health
+curl http://localhost:3333/status
+curl http://localhost:3333/plugin/config
 ```
 
-Common failures:
+Expected healthy state:
 
-- `pluginConnected: false`: run the desktop plugin in the target file.
-- `PLUGIN_DISCONNECTED`: plugin window closed, stale socket terminated, or server restarted.
-- `PLUGIN_TIMEOUT`: Figma did not return before `REQUEST_TIMEOUT_MS`.
-- `AUTHENTICATION_ERROR`: REST OAuth is missing for REST-only operations.
-- `Unauthorized`: diagnostics override has the wrong token; reconnect the plugin normally.
-
-## Code Boundaries
-
-Keep source and current documentation only.
-
-Do not add non-current narrative files or local runtime output.
-
-Generated/local runtime artifacts are not source:
-
-- `node_modules/`
-- `dist/`
-- `.data/`
-- `.env`
-- `coverage/`
-- `docs/generated/`
-
-## Validation Expectations
-
-For production changes, verify at least:
-
-```bash
-pnpm build
-pnpm run typecheck
+```json
+{
+  "ok": true,
+  "pluginConnected": true
+}
 ```
 
-For live Figma validation, use this repository's custom MCP server and desktop plugin only. If the live plugin is unavailable, stop at `pluginConnected: false` and give the blocker instruction above.
+If `pluginConnected=false`, the server is reachable but the Figma plugin is not connected.
+
+Plugin UI:
+
+- Normal mode shows connection state, file, page, and server.
+- Diagnostics mode shows WebSocket logs, reconnect attempts, and heartbeat status.
+- Raw logs are hidden by default.
+
+## Git Safety
+
+Do not commit, push, open PRs, rewrite history, delete branches, or modify remote state unless the user explicitly changes that rule.

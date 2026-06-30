@@ -12,10 +12,12 @@ export const manifestPath = path.join(rootDir, "figma-plugin", "manifest.json");
 export const pluginDistPath = path.join(rootDir, "figma-plugin", "dist", "code.js");
 export const serverDistPath = path.join(rootDir, "mcp-server", "dist", "index.js");
 
-export function checkNodeVersion(minMajor = 20) {
-  const major = Number.parseInt(process.versions.node.split(".")[0] ?? "0", 10);
-  if (!Number.isFinite(major) || major < minMajor) {
-    throw new Error(`Node.js ${minMajor}+ is required. Current version: ${process.version}`);
+export function checkNodeVersion(requiredMajor = 22, minMinor = 5) {
+  const [rawMajor, rawMinor] = process.versions.node.split(".");
+  const major = Number.parseInt(rawMajor ?? "0", 10);
+  const minor = Number.parseInt(rawMinor ?? "0", 10);
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || major !== requiredMajor || minor < minMinor) {
+    throw new Error(`Node.js ${requiredMajor}.${minMinor}+ on major ${requiredMajor} is required. Current version: ${process.version}`);
   }
 }
 
@@ -23,8 +25,6 @@ export function ensureLocalState() {
   fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   ensureFile(envPath, defaultEnv(), 0o600);
   ensureSecret(pluginTokenPath, 32);
-  ensureSecret(path.join(dataDir, "server-shared-secret"), 32);
-  ensureFile(path.join(dataDir, "encryption.key"), crypto.randomBytes(32).toString("hex") + "\n", 0o600);
 }
 
 export function loadLocalEnv() {
@@ -108,11 +108,5 @@ PORT=3333
 DATABASE_PATH=.data/figma-mcp.sqlite
 LOG_LEVEL=warn
 REQUEST_TIMEOUT_MS=30000
-
-# Optional. Only needed for REST-only features such as comments, versions,
-# external file fetches, and remote team resources.
-FIGMA_CLIENT_ID=
-FIGMA_CLIENT_SECRET=
-OAUTH_REDIRECT_URI=http://127.0.0.1:3333/auth/callback
 `;
 }

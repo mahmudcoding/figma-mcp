@@ -114,7 +114,6 @@ function sendPluginMetadata(): void {
     payload: {
       protocolVersion: "1.0.0",
       pluginId: "custom-figma-mcp-bridge",
-      fileKey: figma.fileKey ?? undefined,
       fileName: figma.root.name,
       editorType: figma.editorType,
       currentPageId: figma.currentPage.id,
@@ -190,7 +189,6 @@ async function executeCommand(command: PluginCommandType, payload: UnknownRecord
     case PluginCommand.POLL_EVENTS:
       return pollEvents(CommandSchemas[PluginCommand.POLL_EVENTS].parse(payload));
     case PluginCommand.GET_API_SCHEMA:
-    case PluginCommand.REST_REQUEST:
       throw new AppError("UNSUPPORTED_OPERATION", `${command} is handled by the MCP server`);
     default:
       throw new AppError("UNSUPPORTED_OPERATION", `Unsupported command ${String(command)}`);
@@ -205,7 +203,6 @@ async function getDocument(): Promise<unknown> {
   }
 
   return {
-    fileKey: figma.fileKey ?? null,
     name: figma.root.name,
     editorType: figma.editorType,
     currentPageId: figma.currentPage.id,
@@ -643,7 +640,6 @@ function batchOperationMayMutate(command: PluginCommandType, payload: unknown): 
     case PluginCommand.DUPLICATE_NODE:
     case PluginCommand.UPDATE_VARIABLE:
     case PluginCommand.SET_PROPERTY:
-    case PluginCommand.REST_REQUEST:
       return true;
     case PluginCommand.CALL_API:
       return isRecord(payload) && typeof payload.method === "string" && rawApiMethodMayMutate(payload.method);
@@ -878,9 +874,6 @@ async function resolveApiTarget(
       break;
     case "variables":
       target = requireFigmaObject("variables");
-      break;
-    case "teamLibrary":
-      target = requireFigmaObject("teamLibrary");
       break;
     case "codegen":
       target = requireFigmaObject("codegen");

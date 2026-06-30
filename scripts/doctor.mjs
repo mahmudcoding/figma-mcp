@@ -54,7 +54,7 @@ for (const check of checks) {
 const failed = checks.filter((check) => !check.ok);
 if (failed.length > 0) {
   console.log("");
-  console.log("Doctor found issues. Run ./install.sh, then pnpm start.");
+  console.log("Doctor found issues. Run ./run.sh.");
   process.exit(1);
 }
 

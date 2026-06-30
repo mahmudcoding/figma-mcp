@@ -16,5 +16,5 @@ console.log("");
 console.log("Setup complete.");
 console.log("");
 console.log("Start the local MCP server:");
-console.log("  pnpm start");
+console.log("  ./run.sh");
 printPluginInstructions();

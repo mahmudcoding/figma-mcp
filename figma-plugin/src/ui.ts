@@ -9,7 +9,6 @@ import {
 interface PluginMetadata {
   protocolVersion: string;
   pluginId: string;
-  fileKey?: string;
   fileName?: string;
   editorType?: string;
   currentPageId?: string;
@@ -133,7 +132,7 @@ async function connectWithFreshConfig(): Promise<void> {
   clearReconnectTimer();
   const loaded = await loadServerConfig();
   if (!loaded) {
-    scheduleReconnect("Local MCP server is not running. Start it with pnpm start, then reconnect.", "offline");
+    scheduleReconnect("Local MCP server is not running. Start it with ./run.sh, then reconnect.", "offline");
     return;
   }
 
@@ -264,16 +263,12 @@ function sendHello(): void {
   const payload: {
     protocolVersion: string;
     pluginId: string;
-    fileKey?: string;
     fileName?: string;
     editorType?: string;
   } = {
     protocolVersion: PROTOCOL_VERSION,
     pluginId: "custom-figma-mcp-bridge"
   };
-  if (metadata.fileKey) {
-    payload.fileKey = metadata.fileKey;
-  }
   if (metadata.fileName) {
     payload.fileName = metadata.fileName;
   }

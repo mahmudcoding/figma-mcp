@@ -1,14 +1,9 @@
 import http from "node:http";
 import express from "express";
-import type { Logger } from "pino";
-import { AppError } from "@custom-figma-mcp/shared";
 import type { AppConfig } from "./config.js";
-import type { OAuthService } from "./oauth.js";
 
 export function createHttpServer(
   config: AppConfig,
-  logger: Logger,
-  oauth: OAuthService,
   getRuntimeStatus: () => Record<string, unknown> = () => ({})
 ): http.Server {
   const app = express();
@@ -44,36 +39,6 @@ export function createHttpServer(
       authToken: config.pluginAuthToken,
       status: getRuntimeStatus()
     });
-  });
-
-  app.get("/auth/login", (_req, res) => {
-    try {
-      res.redirect(oauth.createLoginUrl());
-    } catch (error) {
-      logger.warn({ error }, "OAuth login failed");
-      res
-        .status(error instanceof AppError && error.code === "AUTHENTICATION_ERROR" ? 400 : 500)
-        .send(error instanceof Error ? error.message : "OAuth login failed");
-    }
-  });
-
-  app.get("/auth/callback", async (req, res) => {
-    try {
-      const code = String(req.query.code ?? "");
-      const state = String(req.query.state ?? "");
-      if (!code || !state) {
-        res.status(400).send("Missing code or state");
-        return;
-      }
-
-      const user = await oauth.handleCallback(code, state);
-      res
-        .status(200)
-        .send(`Figma OAuth connected for ${user.email}. You can close this tab and return to Codex.`);
-    } catch (error) {
-      logger.error({ error }, "OAuth callback failed");
-      res.status(500).send(error instanceof Error ? error.message : "OAuth callback failed");
-    }
   });
 
   return http.createServer(app);

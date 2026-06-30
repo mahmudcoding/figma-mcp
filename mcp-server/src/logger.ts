@@ -7,13 +7,8 @@ export function createLogger(config: AppConfig) {
       level: config.logLevel,
       redact: {
         paths: [
-          "figmaClientSecret",
           "pluginAuthToken",
-          "serverSharedSecret",
-          "*.access_token",
-          "*.refresh_token",
-          "*.encrypted_access_token",
-          "*.encrypted_refresh_token"
+          "*.authToken"
         ],
         censor: "[redacted]"
       }

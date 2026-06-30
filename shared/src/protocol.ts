@@ -30,7 +30,6 @@ export const PluginCommand = {
   CALL_API: "CALL_API",
   GET_PROPERTY: "GET_PROPERTY",
   SET_PROPERTY: "SET_PROPERTY",
-  REST_REQUEST: "REST_REQUEST",
   SUBSCRIBE_EVENT: "SUBSCRIBE_EVENT",
   UNSUBSCRIBE_EVENT: "UNSUBSCRIBE_EVENT",
   POLL_EVENTS: "POLL_EVENTS"
@@ -64,7 +63,6 @@ export const McpToolName = {
   "figma.call_api": PluginCommand.CALL_API,
   "figma.get_property": PluginCommand.GET_PROPERTY,
   "figma.set_property": PluginCommand.SET_PROPERTY,
-  "figma.rest_request": PluginCommand.REST_REQUEST,
   "figma.subscribe_event": PluginCommand.SUBSCRIBE_EVENT,
   "figma.unsubscribe_event": PluginCommand.UNSUBSCRIBE_EVENT,
   "figma.poll_events": PluginCommand.POLL_EVENTS
@@ -83,7 +81,6 @@ export interface PluginHelloMessage {
   payload: {
     protocolVersion: string;
     pluginId: string;
-    fileKey?: string;
     fileName?: string;
     editorType?: string;
   };

@@ -1,60 +1,29 @@
 # Quickstart
 
-Fresh clone to working local Figma MCP.
-
-## 1. Install
+From a fresh clone to a running local Figma MCP server:
 
 ```bash
-./install.sh
+git clone <repo-url>
+cd figma-mcp
+./run.sh
 ```
 
-## 2. Start
+One-time Figma setup:
+
+1. Open Figma Desktop and log in.
+2. `Plugins -> Development -> Import plugin from manifest...`
+3. Select `figma-plugin/manifest.json`.
+4. Run `Plugins -> Development -> Custom Figma MCP Bridge`.
+
+Agent setup:
+
+- Codex: follow [docs/codex-setup.md](docs/codex-setup.md).
+- Claude Code: follow [docs/claude-code-setup.md](docs/claude-code-setup.md).
+
+Verify:
 
 ```bash
-pnpm start
+curl http://localhost:3333/health
 ```
 
-Keep this process running.
-
-## 3. Import Plugin
-
-In Figma Desktop:
-
-1. `Plugins -> Development -> Import plugin from manifest...`
-2. Select `figma-plugin/manifest.json`
-3. Open the target Figma file
-4. Run `Plugins -> Development -> Custom Figma MCP Bridge`
-
-The plugin connects automatically. No token paste is needed.
-
-## 4. Verify
-
-```bash
-curl http://127.0.0.1:3333/health
-```
-
-Ready:
-
-```json
-{
-  "ok": true,
-  "pluginConnected": true
-}
-```
-
-## 5. Use From Codex
-
-Register the MCP server after setup:
-
-```bash
-codex mcp add custom-figma-local -- node /path/to/figma-mcp/mcp-server/dist/index.js
-```
-
-Restart Codex. Use the custom local Figma MCP tools against the current open Figma Desktop file.
-
-## Troubleshoot
-
-```bash
-pnpm run doctor
-pnpm run plugin:info
-```
+`pluginConnected=true` means the server and Figma Desktop plugin are connected.

@@ -101,7 +101,7 @@ const TOOL_METADATA: Record<McpToolNameType, ToolMetadata> = {
   },
   "figma.get_api_schema": {
     title: "Get generated Figma API schema",
-    description: "Return the generated contract parsed from official Figma Plugin API typings and REST OpenAPI sources."
+    description: "Return the generated contract parsed from Figma Plugin API typings."
   },
   "figma.call_api": {
     title: "Call raw Figma Plugin API",
@@ -114,10 +114,6 @@ const TOOL_METADATA: Record<McpToolNameType, ToolMetadata> = {
   "figma.set_property": {
     title: "Set raw Figma Plugin API property",
     description: "Set any writable Plugin API property on figma, a node, page, style, variable, or API namespace."
-  },
-  "figma.rest_request": {
-    title: "Call raw Figma REST API",
-    description: "Call any official Figma REST API operation by operationId or raw method/path using stored OAuth tokens."
   },
   "figma.subscribe_event": {
     title: "Subscribe to Figma event",

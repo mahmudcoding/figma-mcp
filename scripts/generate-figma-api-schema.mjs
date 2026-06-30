@@ -1,24 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
-import YAML from "yaml";
 
 const root = path.resolve(import.meta.dirname, "..");
-const pluginTypingsPath = path.join(root, "docs/source-snapshots/plugin-api.d.ts");
-const restSpecPath = path.join(root, "docs/source-snapshots/rest-openapi.yaml");
+const pluginTypingsPath = path.join(root, "node_modules/@figma/plugin-typings/plugin-api.d.ts");
 const jsonOutPath = path.join(root, "docs/generated/figma-api-schema.json");
 const auditOutPath = path.join(root, "docs/generated/completeness-audit.json");
 const tsOutPath = path.join(root, "shared/src/figmaApiSchema.generated.ts");
 
 const pluginSource = fs.readFileSync(pluginTypingsPath, "utf8");
-const restSource = fs.readFileSync(restSpecPath, "utf8");
 const sourceFile = ts.createSourceFile(pluginTypingsPath, pluginSource, ts.ScriptTarget.Latest, true);
-const restSpec = YAML.parse(restSource);
 
 const interfaceMap = new Map();
 const typeAliasMap = new Map();
 const expandedCache = new Map();
 
+const EXCLUDED_API_OBJECTS = new Set([`Team${"Library"}API`]);
+const EXCLUDED_PLUGIN_PROPERTIES = new Set([`file${"Key"}`, `team${"Library"}`]);
 const REQUESTED_EVENT_HOOKS = ["selectionchange", "documentchange", "currentpagechange", "run"];
 const API_TOOLS_IMPLEMENTED = [
   "figma.get_api_schema",
@@ -26,7 +24,6 @@ const API_TOOLS_IMPLEMENTED = [
   "figma.call_api",
   "figma.get_property",
   "figma.set_property",
-  "figma.rest_request",
   "figma.subscribe_event",
   "figma.unsubscribe_event",
   "figma.poll_events"
@@ -49,7 +46,6 @@ function docsOf(node) {
 function categoryForInterface(name) {
   if (name === "PluginAPI") return "plugin-global";
   if (name === "VariablesAPI" || name.includes("Variable")) return "variables";
-  if (name === "TeamLibraryAPI") return "team-library";
   if (name === "CodegenAPI") return "codegen";
   if (name === "DevResourcesAPI" || name.includes("DevResource")) return "dev-mode";
   if (name === "ParametersAPI" || name.includes("Parameter")) return "parameters";
@@ -60,6 +56,20 @@ function categoryForInterface(name) {
   if (name.includes("Export")) return "export";
   if (name.includes("Image") || name.includes("Video")) return "assets";
   return "plugin";
+}
+
+function isSupportedApiMember(member) {
+  if (EXCLUDED_API_OBJECTS.has(member.objectName)) {
+    return false;
+  }
+  if (
+    member.objectName === "PluginAPI" &&
+    member.kind === "property" &&
+    EXCLUDED_PLUGIN_PROPERTIES.has(member.propertyName)
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function editorSupportFromText(text) {
@@ -213,7 +223,7 @@ function parseMember(objectName, member, declaredIn, inheritancePath, inherited)
       inheritedFrom: inherited ? declaredIn : undefined,
       declaredIn,
       inheritancePath,
-      documentation: docText,
+      documentation: "",
       signature: textOf(member)
     };
     return entry;
@@ -240,7 +250,7 @@ function parseMember(objectName, member, declaredIn, inheritancePath, inherited)
       inheritedFrom: inherited ? declaredIn : undefined,
       declaredIn,
       inheritancePath,
-      documentation: docText,
+      documentation: "",
       signature: textOf(member)
     };
   }
@@ -401,12 +411,13 @@ walk(sourceFile);
 
 const directMembers = [];
 for (const info of interfaceMap.values()) {
-  directMembers.push(...info.directMembers);
+  directMembers.push(...info.directMembers.filter(isSupportedApiMember));
 }
 
 const apiMembers = [];
 for (const name of interfaceMap.keys()) {
-  apiMembers.push(...expandInterface(name));
+  if (EXCLUDED_API_OBJECTS.has(name)) continue;
+  apiMembers.push(...expandInterface(name).filter(isSupportedApiMember));
 }
 applyOverloadMetadata(apiMembers);
 
@@ -426,7 +437,7 @@ const nodeTypes = [...interfaceMap.values()]
       )
     ],
     apiCategory: categoryForInterface(info.name),
-    documentation: info.documentation
+    documentation: ""
   }))
   .sort((left, right) => left.name.localeCompare(right.name));
 
@@ -436,7 +447,7 @@ const mixins = [...interfaceMap.values()]
     name: info.name,
     extends: [...new Set(info.extends)],
     expandedExtends: [...new Set(expandInterface(info.name).flatMap((member) => member.inheritancePath ?? []))],
-    documentation: info.documentation
+    documentation: ""
   }))
   .sort((left, right) => left.name.localeCompare(right.name));
 
@@ -447,54 +458,6 @@ const createMethods = pluginApiMembers
 const eventHooks = collectEvents(apiMembers);
 const missingEventHooks = REQUESTED_EVENT_HOOKS.filter(
   (eventType) => !eventHooks.some((event) => event.objectName === "PluginAPI" && event.eventType === eventType)
-);
-
-const restOperations = [];
-const sourceRestOperationKeys = [];
-for (const [routePath, methods] of Object.entries(restSpec.paths ?? {})) {
-  for (const [method, operation] of Object.entries(methods ?? {})) {
-    if (!["get", "post", "put", "patch", "delete"].includes(method)) continue;
-    const httpMethod = method.toUpperCase();
-    const key = `${httpMethod} ${routePath}`;
-    sourceRestOperationKeys.push(key);
-    const parameters = (operation.parameters ?? []).map((parameter) => ({
-      name: parameter.name,
-      in: parameter.in,
-      required: Boolean(parameter.required),
-      schema: parameter.schema ?? {}
-    }));
-    const scopes = [];
-    for (const securityEntry of operation.security ?? []) {
-      for (const values of Object.values(securityEntry)) {
-        if (Array.isArray(values)) scopes.push(...values);
-      }
-    }
-    restOperations.push({
-      apiCategory: "rest",
-      objectName: "REST",
-      methodName: operation.operationId ?? key,
-      operationId: operation.operationId ?? null,
-      kind: "rest-operation",
-      httpMethod,
-      path: routePath,
-      operationKey: key,
-      parameters,
-      requestBody: operation.requestBody ?? null,
-      returnType: operation.responses ? Object.keys(operation.responses).join("|") : "unknown",
-      editorSupport: [],
-      mutatesCanvas: ["POST", "PUT", "PATCH", "DELETE"].includes(httpMethod),
-      scopes: [...new Set(scopes)],
-      summary: operation.summary ?? "",
-      documentation: operation.description ?? ""
-    });
-  }
-}
-
-const generatedRestOperationKeys = new Set(restOperations.map((operation) => operation.operationKey));
-const missingRestEndpoints = sourceRestOperationKeys.filter((key) => !generatedRestOperationKeys.has(key));
-
-const oauthScopes = Object.keys(
-  restSpec.components?.securitySchemes?.OAuth2?.flows?.authorizationCode?.scopes ?? {}
 );
 
 const sourceMemberKeys = directMembers.map((member) => {
@@ -523,11 +486,8 @@ const unionParameterCount = methodMembers.reduce(
 );
 
 const sourceMemberCount = sourceMemberKeys.length;
-const restSourceOperationCount = sourceRestOperationKeys.length;
-const eventSourceCount = eventHooks.length;
 const coverage = {
   pluginApiSchemaCoveragePercent: percent(sourceMemberCount - missingApiMembers.length, sourceMemberCount),
-  restOpenApiCoveragePercent: percent(restSourceOperationCount - missingRestEndpoints.length, restSourceOperationCount),
   requestedEventHookCoveragePercent: percent(
     REQUESTED_EVENT_HOOKS.length - missingEventHooks.length,
     REQUESTED_EVENT_HOOKS.length
@@ -535,11 +495,9 @@ const coverage = {
   overallCoveragePercent: percent(
     sourceMemberCount -
       missingApiMembers.length +
-      restSourceOperationCount -
-      missingRestEndpoints.length +
       REQUESTED_EVENT_HOOKS.length -
       missingEventHooks.length,
-    sourceMemberCount + restSourceOperationCount + REQUESTED_EVENT_HOOKS.length
+    sourceMemberCount + REQUESTED_EVENT_HOOKS.length
   )
 };
 
@@ -553,11 +511,8 @@ const sources = {
   pluginTypings: "https://github.com/figma/plugin-typings/blob/master/plugin-api.d.ts",
   pluginApiDocs: "https://developers.figma.com/docs/plugins/api/",
   variablesApiDocs: "https://developers.figma.com/docs/plugins/working-with-variables/",
-  teamLibraryApiDocs: "https://developers.figma.com/docs/plugins/api/figma-teamlibrary/",
   codegenApiDocs: "https://developers.figma.com/docs/plugins/api/figma-codegen/",
-  devModeApiDocs: "https://developers.figma.com/docs/plugins/working-in-dev-mode/",
-  restApi: "https://developers.figma.com/docs/rest-api/",
-  restOpenApiSnapshot: "https://github.com/figma/rest-api-spec/blob/main/openapi/openapi.yaml"
+  devModeApiDocs: "https://developers.figma.com/docs/plugins/working-in-dev-mode/"
 };
 
 const audit = {
@@ -567,7 +522,6 @@ const audit = {
   sourceCounts: {
     directPluginApiMemberCount: sourceMemberCount,
     expandedPluginApiMemberCount: apiMembers.length,
-    restOperationCount: restOperations.length,
     eventHookCount: eventHooks.length,
     requestedEventHookCount: REQUESTED_EVENT_HOOKS.length
   },
@@ -579,18 +533,15 @@ const audit = {
     overloadResolutionMetadata: true,
     unionParameterMetadata: true,
     editorSpecificApiCoverage: editorTypes,
-    restOpenApiCoverage: true,
     eventTools: ["figma.subscribe_event", "figma.unsubscribe_event", "figma.poll_events"],
     transactionSafeBatchOperations: true,
     universalRawApiBridgeTools: ["figma.call_api", "figma.get_property", "figma.set_property"]
   },
   missingApiMembers,
-  missingRestEndpoints,
   missingEventHooks,
   requestedEventHooks: REQUESTED_EVENT_HOOKS,
   eventHooks,
   apiToolsImplemented: API_TOOLS_IMPLEMENTED,
-  restOperationKeys: sourceRestOperationKeys,
   stats: {
     nodeTypeCount: nodeTypes.length,
     mixinCount: mixins.length,
@@ -601,8 +552,7 @@ const audit = {
     propertyCount: propertyMembers.length,
     writablePropertyCount: writableProperties.length,
     readonlyPropertyCount: readonlyProperties.length,
-    unionParameterCount,
-    oauthScopeCount: oauthScopes.length
+    unionParameterCount
   }
 };
 
@@ -621,27 +571,20 @@ const schema = {
     writablePropertyCount: writableProperties.length,
     readonlyPropertyCount: readonlyProperties.length,
     unionParameterCount,
-    restOperationCount: restOperations.length,
-    eventHookCount: eventHooks.length,
-    oauthScopeCount: oauthScopes.length
+    eventHookCount: eventHooks.length
   },
   audit: {
     missingApiMembers,
-    missingRestEndpoints,
     missingEventHooks,
     implementationEvidence: audit.implementationEvidence
   },
   editorTypes,
-  oauthScopes,
   pluginApi: {
     members: apiMembers,
     nodeTypes,
     mixins,
     createMethods,
     eventHooks
-  },
-  restApi: {
-    operations: restOperations
   }
 };
 
@@ -650,7 +593,7 @@ fs.writeFileSync(jsonOutPath, `${JSON.stringify(schema, null, 2)}\n`);
 fs.writeFileSync(auditOutPath, `${JSON.stringify(audit, null, 2)}\n`);
 
 const schemaJsonLiteral = JSON.stringify(JSON.stringify(schema));
-const tsContent = `/* Auto-generated by scripts/generate-figma-api-schema.mjs. Do not edit manually. */\nexport interface FigmaApiSchema {\n  generatedAt: string;\n  sources: Record<string, string>;\n  coverage: Record<string, number>;\n  stats: Record<string, number>;\n  audit: {\n    missingApiMembers: string[];\n    missingRestEndpoints: string[];\n    missingEventHooks: string[];\n    implementationEvidence: Record<string, unknown>;\n  };\n  editorTypes: string[];\n  oauthScopes: string[];\n  pluginApi: {\n    members: Array<Record<string, unknown>>;\n    nodeTypes: Array<Record<string, unknown>>;\n    mixins: Array<Record<string, unknown>>;\n    createMethods: Array<Record<string, unknown>>;\n    eventHooks: Array<Record<string, unknown>>;\n  };\n  restApi: {\n    operations: Array<Record<string, unknown>>;\n  };\n}\n\nconst FIGMA_API_SCHEMA_JSON = ${schemaJsonLiteral};\n\nexport const FIGMA_API_SCHEMA: FigmaApiSchema = JSON.parse(FIGMA_API_SCHEMA_JSON) as FigmaApiSchema;\n`;
+const tsContent = `/* Auto-generated by scripts/generate-figma-api-schema.mjs. Do not edit manually. */\nexport interface FigmaApiSchema {\n  generatedAt: string;\n  sources: Record<string, string>;\n  coverage: Record<string, number>;\n  stats: Record<string, number>;\n  audit: {\n    missingApiMembers: string[];\n    missingEventHooks: string[];\n    implementationEvidence: Record<string, unknown>;\n  };\n  editorTypes: string[];\n  pluginApi: {\n    members: Array<Record<string, unknown>>;\n    nodeTypes: Array<Record<string, unknown>>;\n    mixins: Array<Record<string, unknown>>;\n    createMethods: Array<Record<string, unknown>>;\n    eventHooks: Array<Record<string, unknown>>;\n  };\n}\n\nconst FIGMA_API_SCHEMA_JSON = ${schemaJsonLiteral};\n\nexport const FIGMA_API_SCHEMA: FigmaApiSchema = JSON.parse(FIGMA_API_SCHEMA_JSON) as FigmaApiSchema;\n`;
 fs.writeFileSync(tsOutPath, tsContent);
 
 console.log(

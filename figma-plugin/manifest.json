@@ -6,7 +6,6 @@
   "ui": "dist/ui.html",
   "editorType": ["figma", "figjam", "dev", "slides", "buzz"],
   "documentAccess": "dynamic-page",
-  "permissions": ["teamlibrary"],
   "networkAccess": {
     "allowedDomains": [
       "http://localhost:3333",

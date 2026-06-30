@@ -9,14 +9,12 @@ import {
 import type { AuditRepository } from "./db/repositories.js";
 import type { FigmaWebSocketHub } from "./wsHub.js";
 import { assertOperationAllowed } from "./permissions.js";
-import type { RestApiService } from "./restApi.js";
 
 export class CommandDispatcher {
   public constructor(
     private readonly hub: FigmaWebSocketHub,
     private readonly audit: AuditRepository,
-    private readonly logger: Logger,
-    private readonly restApi: RestApiService
+    private readonly logger: Logger
   ) {}
 
   public async execute(command: PluginCommandType, payload: unknown): Promise<unknown> {
@@ -27,9 +25,7 @@ export class CommandDispatcher {
       const result =
         command === PluginCommand.GET_API_SCHEMA
           ? filterApiSchema(parsed)
-          : command === PluginCommand.REST_REQUEST
-            ? await this.restApi.request(parsed)
-            : await this.hub.sendCommand(command, parsed);
+          : await this.hub.sendCommand(command, parsed);
       this.audit.write({ command, payload: parsed, result, success: true });
       return result;
     } catch (error) {
@@ -46,7 +42,6 @@ function filterApiSchema(payload: unknown): unknown {
     category?: string;
     objectName?: string;
     memberName?: string;
-    restOperationId?: string;
     mutatesCanvas?: boolean;
     limit?: number;
   };
@@ -65,12 +60,6 @@ function filterApiSchema(payload: unknown): unknown {
     .filter((member) => query.mutatesCanvas === undefined || member.mutatesCanvas === query.mutatesCanvas)
     .slice(0, limit);
 
-  const restOperations = FIGMA_API_SCHEMA.restApi.operations
-    .filter((operation) => !query.restOperationId || operation.methodName === query.restOperationId)
-    .filter((operation) => !query.category || operation.apiCategory === query.category)
-    .filter((operation) => query.mutatesCanvas === undefined || operation.mutatesCanvas === query.mutatesCanvas)
-    .slice(0, limit);
-
   return {
     generatedAt: FIGMA_API_SCHEMA.generatedAt,
     sources: FIGMA_API_SCHEMA.sources,
@@ -78,16 +67,12 @@ function filterApiSchema(payload: unknown): unknown {
     stats: FIGMA_API_SCHEMA.stats,
     audit: FIGMA_API_SCHEMA.audit,
     editorTypes: FIGMA_API_SCHEMA.editorTypes,
-    oauthScopes: FIGMA_API_SCHEMA.oauthScopes,
     pluginApi: {
       members: pluginMembers,
       nodeTypes: FIGMA_API_SCHEMA.pluginApi.nodeTypes,
       mixins: FIGMA_API_SCHEMA.pluginApi.mixins,
       createMethods: FIGMA_API_SCHEMA.pluginApi.createMethods,
       eventHooks: FIGMA_API_SCHEMA.pluginApi.eventHooks
-    },
-    restApi: {
-      operations: restOperations
     }
   };
 }

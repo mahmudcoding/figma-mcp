@@ -1,107 +1,54 @@
 # Project Context
 
-## Current Truth
+This project is a custom local Figma MCP system for live desktop editing.
 
-This repository implements a production-oriented custom local Figma MCP system for controlling the currently open Figma Desktop file.
-
-Normal editing uses:
-
-- custom local MCP server
-- custom Figma Desktop plugin
-- Figma Plugin API
-- current open Figma file
-
-Normal editing does not use browser tabs, design URLs, file keys, hosted connectors, official Figma MCP, or REST.
-
-REST is available only for comments, versions/history, external file fetches, and remote team/library resources.
-
-## Runtime Architecture
+## Current Architecture
 
 ```text
 AI agent
   <-> MCP stdio
-Custom local MCP server
-  <-> loopback HTTP/WebSocket
-Custom Figma Desktop plugin
+Local MCP server
+  <-> localhost WebSocket
+Figma Desktop plugin
   <-> Figma Plugin API
 Current open Figma file
 ```
 
-Defaults:
-
-- server: `127.0.0.1:3333`
-- health: `http://127.0.0.1:3333/health`
-- plugin config: `http://localhost:3333/plugin/config`
-- websocket: `ws://localhost:3333/ws/plugin`
-- plugin name: `Custom Figma MCP Bridge`
-
 ## Capabilities
 
-- Inspect document, current page, selection, nodes, styles, and variables.
-- Create and mutate editable Figma nodes.
-- Use auto-layout, components, variables, styles, exports, raw Plugin API calls, and event subscriptions.
-- Run transactional batches with rollback.
-- Audit command payloads and results.
+- Inspect the open document, page, selection, and nodes.
+- Create and update native Figma nodes.
+- Create auto-layout frames, components, text, rectangles, styles, and variables.
+- Execute raw local Plugin API calls through guarded MCP tools.
+- Batch operations with rollback.
 - Auto-configure the plugin from the local server.
-- Reconnect the plugin automatically after disconnects or server restarts.
-
-## Setup Commands
-
-Fresh install:
-
-```bash
-./install.sh
-```
-
-Start:
-
-```bash
-pnpm start
-```
-
-Diagnose:
-
-```bash
-pnpm run doctor
-```
-
-Build:
-
-```bash
-pnpm build
-```
-
-Typecheck:
-
-```bash
-pnpm run typecheck
-```
-
-Integration tests:
-
-```bash
-pnpm test:integration
-```
+- Reconnect after plugin or server restarts.
 
 ## Constraints
 
-- The desktop plugin must be running in the target Figma file.
-- The only normal-editing blocker is `pluginConnected: false`.
-- The plugin auto-config endpoint is loopback-only.
-- Manual token entry is diagnostics-only.
-- The system cannot bypass Figma permissions, locked files, locked nodes, unavailable fonts, editor-mode restrictions, or Plugin API runtime limits.
+- Normal editing requires Figma Desktop, a logged-in user, the plugin imported once, the plugin running, and the local MCP server running.
+- Server port is `3333` by default because the plugin manifest explicitly allows `localhost:3333`.
+- The plugin edits only the current live open file.
+- No external Figma credentials are required for normal editing.
+- Do not introduce remote file workflows or external Figma file fetching.
 
-## Repository Boundaries
+## Commands
 
-Keep source and current documentation only.
+```bash
+./run.sh
+./run.sh --check
+pnpm build
+pnpm typecheck
+pnpm doctor
+pnpm test:integration
+```
 
-Do not add non-current narrative files or local runtime output.
+## Important Files
 
-Generated/local runtime paths:
-
-- `node_modules/`
-- `dist/`
-- `.data/`
-- `.env`
-- `coverage/`
-- `docs/generated/`
+- `run.sh`: primary setup/start command.
+- `figma-plugin/manifest.json`: Figma Desktop plugin manifest.
+- `mcp-server/src/index.ts`: server bootstrap.
+- `mcp-server/src/wsHub.ts`: WebSocket bridge.
+- `figma-plugin/src/code.ts`: Plugin API executor.
+- `figma-plugin/src/ui.ts`: plugin connection UI.
+- `shared/src/schemas.ts`: MCP command schemas.

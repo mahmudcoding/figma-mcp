@@ -178,7 +178,6 @@ export const GetApiSchemaSchema = z.object({
   category: z.string().min(1).optional(),
   objectName: z.string().min(1).optional(),
   memberName: z.string().min(1).optional(),
-  restOperationId: z.string().min(1).optional(),
   mutatesCanvas: z.boolean().optional(),
   limit: z.number().int().positive().max(5000).default(500).optional()
 }).strict();
@@ -194,7 +193,6 @@ export const ApiTargetSchema = z.enum([
   "variable",
   "variableCollection",
   "variables",
-  "teamLibrary",
   "codegen",
   "devResources",
   "clientStorage",
@@ -260,17 +258,6 @@ export const PollEventsSchema = z.object({
   limit: z.number().int().positive().max(1000).default(100).optional()
 }).strict();
 
-export const RestRequestSchema = z.object({
-  operationId: z.string().min(1).optional(),
-  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
-  path: z.string().min(1).optional(),
-  pathParams: z.record(z.union([z.string(), z.number(), z.boolean()])).default({}).optional(),
-  query: z.record(z.union([z.string(), z.number(), z.boolean(), z.array(z.union([z.string(), z.number(), z.boolean()]))])).default({}).optional(),
-  body: JsonValueSchema.optional(),
-  headers: z.record(z.string()).default({}).optional(),
-  userId: z.string().min(1).optional()
-}).strict();
-
 export const CommandSchemas = {
   [PluginCommand.GET_DOCUMENT]: EmptyPayloadSchema,
   [PluginCommand.GET_CURRENT_PAGE]: EmptyPayloadSchema,
@@ -297,7 +284,6 @@ export const CommandSchemas = {
   [PluginCommand.CALL_API]: CallApiSchema,
   [PluginCommand.GET_PROPERTY]: GetPropertySchema,
   [PluginCommand.SET_PROPERTY]: SetPropertySchema,
-  [PluginCommand.REST_REQUEST]: RestRequestSchema,
   [PluginCommand.SUBSCRIBE_EVENT]: SubscribeEventSchema,
   [PluginCommand.UNSUBSCRIBE_EVENT]: UnsubscribeEventSchema,
   [PluginCommand.POLL_EVENTS]: PollEventsSchema

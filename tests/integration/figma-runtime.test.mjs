@@ -24,7 +24,6 @@ const requireFileNamePattern = process.env.FIGMA_TEST_FILE_NAME_PATTERN
   : undefined;
 const allowAnyFile = process.env.FIGMA_TEST_ALLOW_ANY_FILE === "1";
 const expectedEditor = process.env.FIGMA_TEST_EDITOR;
-const commentsWriteEnabled = process.env.FIGMA_TEST_COMMENTS_WRITE === "1";
 
 const report = {
   runId,
@@ -37,7 +36,6 @@ const report = {
     node: process.version,
     platform: process.platform,
     pluginTimeoutMs,
-    commentsWriteEnabled,
     expectedEditor: expectedEditor ?? null,
     requireFileNamePattern: process.env.FIGMA_TEST_FILE_NAME_PATTERN ?? null,
     allowAnyFile
@@ -53,7 +51,6 @@ const report = {
     unsupportedRuntimeChecks: 0
   },
   figma: {
-    fileKey: null,
     fileName: null,
     editorType: null,
     originalPageId: null,
@@ -99,7 +96,6 @@ test("Figma MCP runtime integration suite", { timeout: Math.max(pluginTimeoutMs 
     }
     const document = documentResult.result;
 
-    report.figma.fileKey = document.fileKey ?? null;
     report.figma.fileName = document.name ?? null;
     report.figma.editorType = document.editorType ?? null;
 
@@ -476,35 +472,6 @@ test("Figma MCP runtime integration suite", { timeout: Math.max(pluginTimeoutMs 
         shared.variableCollectionId = undefined;
       }));
 
-    await t.test("team library", async () => {
-      await runCheck("team library", "list available library variable collections", "figma.call_api", async () => {
-        const result = await callTool("figma.call_api", {
-          target: "teamLibrary",
-          method: "getAvailableLibraryVariableCollectionsAsync",
-          args: []
-        });
-        assert.ok(Array.isArray(result.result));
-      });
-
-      await runCheck("team library", "missing library key returns empty variables list", "figma.call_api", async () => {
-        const result = await callTool("figma.call_api", {
-          target: "teamLibrary",
-          method: "getVariablesInLibraryCollectionAsync",
-          args: [`missing-library-${crypto.randomUUID()}`]
-        });
-        assert.ok(Array.isArray(result.result));
-        assert.equal(result.result.length, 0);
-      });
-
-      await runCheck("team library", "invalid team library method failure path", "figma.call_api", async () => {
-        await expectToolError("figma.call_api", {
-          target: "teamLibrary",
-          method: `missingMethod${crypto.randomUUID().replaceAll("-", "")}`,
-          args: []
-        }, "UNSUPPORTED_OPERATION");
-      });
-    });
-
     await t.test("export", () =>
       runCheck("export", "export node as PNG", "figma.export_node", async () => {
         const exported = await callTool("figma.export_node", {
@@ -515,63 +482,6 @@ test("Figma MCP runtime integration suite", { timeout: Math.max(pluginTimeoutMs 
         assert.equal(exported.mimeType, "image/png");
         assert.ok(exported.base64.length > 20);
       }));
-
-    await t.test("comments REST", async () => {
-      await runCheck("comments", "permission failure for invalid REST comments request", "figma.rest_request", async () => {
-        try {
-          const result = await callToolAllowHttpFailure("figma.rest_request", {
-            operationId: "getComments",
-            pathParams: { file_key: `missing-${crypto.randomUUID()}` }
-          });
-          assert.ok(result.status === 403 || result.status === 404);
-        } catch (error) {
-          assert.equal(error.code, "AUTHENTICATION_ERROR");
-        }
-      });
-
-      await runOptionalCheck("comments", "read comments for configured file", "figma.rest_request", async () => {
-        const fileKey = process.env.FIGMA_TEST_FILE_KEY ?? report.figma.fileKey;
-        if (!fileKey) {
-          throw unsupported("environment", "FIGMA_TEST_FILE_KEY or plugin fileKey is required for comments success test");
-        }
-        const result = await callToolAllowHttpFailure("figma.rest_request", {
-          operationId: "getComments",
-          pathParams: { file_key: fileKey }
-        });
-        if (!result.ok) {
-          throw unsupported("environment", `Comments read returned HTTP ${result.status}; verify OAuth scopes and file access`);
-        }
-        assert.ok(Array.isArray(result.body.comments));
-      });
-
-      await runOptionalCheck("comments", "post and delete temporary comment", "figma.rest_request", async () => {
-        if (!commentsWriteEnabled) {
-          throw unsupported("environment", "Set FIGMA_TEST_COMMENTS_WRITE=1 to allow creating/deleting REST comments");
-        }
-        const fileKey = process.env.FIGMA_TEST_FILE_KEY ?? report.figma.fileKey;
-        if (!fileKey) {
-          throw unsupported("environment", "FIGMA_TEST_FILE_KEY or plugin fileKey is required for comment write test");
-        }
-        const posted = await callToolAllowHttpFailure("figma.rest_request", {
-          operationId: "postComment",
-          pathParams: { file_key: fileKey },
-          body: {
-            message: `Temporary MCP integration comment ${runId}`,
-            client_meta: { x: 0, y: 0 }
-          }
-        });
-        if (!posted.ok) {
-          throw unsupported("environment", `Comment write returned HTTP ${posted.status}; verify file_comments:write scope`);
-        }
-        const commentId = posted.body?.comment?.id ?? posted.body?.id;
-        assert.ok(commentId, "postComment response did not include comment id");
-        const deleted = await callToolAllowHttpFailure("figma.rest_request", {
-          operationId: "deleteComment",
-          pathParams: { file_key: fileKey, comment_id: commentId }
-        });
-        assert.ok(deleted.ok, `deleteComment returned HTTP ${deleted.status}`);
-      });
-    });
 
     await t.test("dev mode", async () => {
       await runOptionalCheck("dev mode", "subscribe Codegen generate in Dev Mode", "figma.subscribe_event", async () => {
@@ -732,7 +642,7 @@ async function waitForPluginDocument() {
   const message = [
     `Figma plugin did not connect within ${pluginTimeoutMs}ms.`,
     `Open a temporary Figma file, run the development plugin from figma-plugin/manifest.json,`,
-    `connect it to ws://${host}:${port}/ws/plugin, and use auth token: ${pluginAuthToken}`
+    `and confirm it can load http://localhost:${port}/plugin/config.`
   ].join(" ");
   if (allowSkipWithoutPlugin) {
     throw unsupported("environment", message);
@@ -794,10 +704,6 @@ async function callTool(name, args, options = {}) {
   return envelope.result;
 }
 
-async function callToolAllowHttpFailure(name, args) {
-  return callTool(name, args, { allowHttpFailure: true });
-}
-
 async function callToolEnvelope(name, args, options = {}) {
   const attempts = options.attempts ?? 2;
   let lastError;
@@ -812,7 +718,7 @@ async function callToolEnvelope(name, args, options = {}) {
       if (!parsed.success) {
         throw toolError(name, parsed.error);
       }
-      if (!options.allowHttpFailure && parsed.result?.ok === false && typeof parsed.result.status === "number") {
+      if (parsed.result?.ok === false && typeof parsed.result.status === "number") {
         throw toolError(name, {
           code: "HTTP_ERROR",
           message: `HTTP ${parsed.result.status} ${parsed.result.statusText ?? ""}`.trim(),
@@ -961,7 +867,6 @@ function renderMarkdownReport(data) {
     "## Figma",
     "",
     `- File: ${data.figma.fileName ?? "unknown"}`,
-    `- File key: ${data.figma.fileKey ?? "unavailable"}`,
     `- Editor: ${data.figma.editorType ?? "unknown"}`,
     `- Temporary page: ${data.figma.temporaryPageName ?? "not created"} (${data.figma.temporaryPageId ?? "n/a"})`,
     "",

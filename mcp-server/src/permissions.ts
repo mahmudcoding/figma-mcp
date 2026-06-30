@@ -15,8 +15,7 @@ const MUTATING_COMMANDS = new Set<PluginCommandType>([
   PluginCommand.UPDATE_VARIABLE,
   PluginCommand.BATCH_OPERATIONS,
   PluginCommand.CALL_API,
-  PluginCommand.SET_PROPERTY,
-  PluginCommand.REST_REQUEST
+  PluginCommand.SET_PROPERTY
 ]);
 
 export function isMutation(command: PluginCommandType): boolean {
