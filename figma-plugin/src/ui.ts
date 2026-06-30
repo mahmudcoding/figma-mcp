@@ -184,7 +184,7 @@ function connect(): void {
   nextSocket.onopen = () => {
     reconnectAttempts = 0;
     lastPongAt = undefined;
-    setConnectionState("connected", "Ready for Codex commands.");
+    setConnectionState("connected", "Ready for Agent commands.");
     log("Connected to local MCP server");
     sendHello();
     flushQueue();
