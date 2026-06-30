@@ -4,6 +4,8 @@ Claude Code runs this project as a local stdio MCP server.
 
 ## Prerequisites
 
+Use Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise).
+
 ```bash
 cd /absolute/path/to/figma-mcp
 ./run.sh --check

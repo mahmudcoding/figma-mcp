@@ -48,7 +48,7 @@ The server exposes:
 Prerequisites:
 
 - Figma Desktop installed and logged in.
-- Node.js 22.5 or newer on major version 22. The server uses `node:sqlite`.
+- Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise). The server uses `node:sqlite`.
 - `pnpm` 10.25 or newer. `./run.sh` can enable it through Corepack when available.
 
 Fresh clone:

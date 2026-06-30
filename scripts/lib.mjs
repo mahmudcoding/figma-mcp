@@ -12,12 +12,12 @@ export const manifestPath = path.join(rootDir, "figma-plugin", "manifest.json");
 export const pluginDistPath = path.join(rootDir, "figma-plugin", "dist", "code.js");
 export const serverDistPath = path.join(rootDir, "mcp-server", "dist", "index.js");
 
-export function checkNodeVersion(requiredMajor = 22, minMinor = 5) {
+export function checkNodeVersion(minMajor = 22, minMinor = 5) {
   const [rawMajor, rawMinor] = process.versions.node.split(".");
   const major = Number.parseInt(rawMajor ?? "0", 10);
   const minor = Number.parseInt(rawMinor ?? "0", 10);
-  if (!Number.isFinite(major) || !Number.isFinite(minor) || major !== requiredMajor || minor < minMinor) {
-    throw new Error(`Node.js ${requiredMajor}.${minMinor}+ on major ${requiredMajor} is required. Current version: ${process.version}`);
+  if (!Number.isFinite(major) || !Number.isFinite(minor) || major < minMajor || (major === minMajor && minor < minMinor)) {
+    throw new Error(`Node.js ${minMajor}.${minMinor}+ is required. Current version: ${process.version}`);
   }
 }
 

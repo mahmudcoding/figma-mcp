@@ -2,6 +2,8 @@
 
 From a fresh clone to a running local Figma MCP server:
 
+Prerequisite: Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise).
+
 ```bash
 git clone <repo-url>
 cd figma-mcp

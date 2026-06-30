@@ -6,7 +6,6 @@ cd "$ROOT_DIR"
 
 REQUIRED_NODE_MIN_MAJOR=22
 REQUIRED_NODE_MIN_MINOR=5
-REQUIRED_NODE_MAJOR=22
 REQUIRED_PNPM_MAJOR=10
 REQUIRED_PNPM_MINOR=25
 HOST="${HOST:-127.0.0.1}"
@@ -53,8 +52,8 @@ require_node() {
   local major minor
   major="$(node -p 'Number(process.versions.node.split(".")[0])')"
   minor="$(node -p 'Number(process.versions.node.split(".")[1])')"
-  if (( major != REQUIRED_NODE_MAJOR || minor < REQUIRED_NODE_MIN_MINOR )); then
-    fail "Node.js ${REQUIRED_NODE_MIN_MAJOR}.${REQUIRED_NODE_MIN_MINOR}+ on major ${REQUIRED_NODE_MAJOR} is required because the server uses node:sqlite. Current: $(node --version)"
+  if (( major < REQUIRED_NODE_MIN_MAJOR || (major == REQUIRED_NODE_MIN_MAJOR && minor < REQUIRED_NODE_MIN_MINOR) )); then
+    fail "Node.js ${REQUIRED_NODE_MIN_MAJOR}.${REQUIRED_NODE_MIN_MINOR}+ is required because the server uses node:sqlite. Current: $(node --version)"
   fi
 }
 
