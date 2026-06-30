@@ -1,31 +1,42 @@
 # Quickstart
 
-From a fresh clone to a running local Figma MCP server:
+Use this when you already have the project on your computer.
 
-Prerequisite: Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise).
+## 1. Start The Local Server
 
 ```bash
-git clone <repo-url>
-cd figma-mcp
+cd /path/to/figma-mcp
 ./run.sh
 ```
 
-One-time Figma setup:
+Keep this Terminal window open.
 
-1. Open Figma Desktop and log in.
-2. `Plugins -> Development -> Import plugin from manifest...`
-3. Select `figma-plugin/manifest.json`.
-4. Run `Plugins -> Development -> Custom Figma MCP Bridge`.
+## 2. Start The Figma Plugin
 
-Agent setup:
+1. Open Figma Desktop.
+2. Open the file you want to edit.
+3. Run `Plugins -> Development -> Custom Figma MCP Bridge`.
 
-- Codex: follow [docs/codex-setup.md](docs/codex-setup.md).
-- Claude Code: follow [docs/claude-code-setup.md](docs/claude-code-setup.md).
+The plugin should show `Connected`.
 
-Verify:
+## 3. Check The Connection
 
 ```bash
 curl http://localhost:3333/health
 ```
 
-`pluginConnected=true` means the server and Figma Desktop plugin are connected.
+Good result:
+
+```json
+{
+  "ok": true,
+  "pluginConnected": true
+}
+```
+
+## 4. Connect Codex Or Claude Code
+
+- Codex: [docs/codex-setup.md](docs/codex-setup.md)
+- Claude Code: [docs/claude-code-setup.md](docs/claude-code-setup.md)
+
+After setup, restart the AI tool and check `/mcp`.

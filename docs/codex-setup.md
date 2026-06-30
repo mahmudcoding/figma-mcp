@@ -1,56 +1,69 @@
 # Codex Setup
 
-Codex runs this project as a stdio MCP server.
+Codex connects to this project through a local stdio MCP server.
 
-## Prerequisites
+Normal Figma editing still happens through Figma Desktop and the local plugin. Codex does not need a Figma API key, OAuth, a file key, or a Figma design URL.
 
-Use Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise).
+## Before You Add It
+
+Run this once from the repo:
 
 ```bash
 cd /absolute/path/to/figma-mcp
 ./run.sh --check
 ```
 
-Use an absolute path in Codex config.
+Use the real absolute path on your machine.
 
-## Option 1: CLI
+## Add To Codex
 
 ```bash
 codex mcp add custom-figma-mcp -- /bin/zsh -lc 'cd /absolute/path/to/figma-mcp && node mcp-server/dist/index.js'
 ```
 
-Verify:
+Do not use `./run.sh` as the Codex MCP command. `./run.sh` is for your Terminal. Codex needs the direct `node mcp-server/dist/index.js` command.
+
+If you already added it and want to replace it:
 
 ```bash
-codex mcp get custom-figma-mcp
-codex mcp list
+codex mcp remove custom-figma-mcp
+codex mcp add custom-figma-mcp -- /bin/zsh -lc 'cd /absolute/path/to/figma-mcp && node mcp-server/dist/index.js'
 ```
 
-Restart Codex after adding the server. In the Codex TUI, use `/mcp` to verify the server is loaded.
+## Start A Normal Session
 
-## Option 2: Config File
+1. Open the target file in Figma Desktop.
+2. Run this repo:
 
-Codex uses `~/.codex/config.toml` by default.
-
-```toml
-[mcp_servers.custom-figma-mcp]
-command = "/bin/zsh"
-args = ["-lc", "cd /absolute/path/to/figma-mcp && node mcp-server/dist/index.js"]
+```bash
+cd /absolute/path/to/figma-mcp
+./run.sh
 ```
 
-Restart Codex after editing config.
+3. In Figma Desktop, run `Plugins -> Development -> Custom Figma MCP Bridge`.
+4. Restart Codex.
+5. In Codex, run `/mcp` and look for `custom-figma-mcp`.
+6. Ask Codex to call `figma.get_document`.
 
-## Verification
-
-1. Start the local server with `./run.sh`.
-2. Open Figma Desktop and run `Custom Figma MCP Bridge`.
-3. In Codex, use `/mcp`.
-4. Ask Codex to call `figma.get_document`.
-
-Expected server health:
+## Check From Terminal
 
 ```bash
 curl http://localhost:3333/health
 ```
 
-`pluginConnected=true` means Codex can reach the live Figma Desktop plugin through this repo.
+Good result:
+
+```json
+{
+  "ok": true,
+  "pluginConnected": true
+}
+```
+
+`pluginConnected=true` means the Figma Desktop plugin is connected to the local bridge.
+
+## How Startup Works
+
+The first running server owns `localhost:3333` and talks to the Figma plugin on `/ws/plugin`.
+
+When Codex starts its MCP process, that process checks for the existing local bridge. If it exists, Codex uses the local `/ws/mcp` proxy instead of trying to open port `3333` again.

@@ -1,72 +1,123 @@
 # Architecture
 
-Custom Figma MCP is a local, write-capable bridge from an AI agent to the current open Figma Desktop file.
+Custom Figma MCP is a local, write-capable bridge from an AI agent to the currently open Figma Desktop file.
+
+It is not the official Figma MCP. Normal editing does not use Figma OAuth, Figma REST, file keys, design URLs, or the Figma web app.
 
 ## Runtime Model
 
 ```text
 Codex / Claude Code
-  <-> MCP stdio
+  <-> MCP over stdio
 Custom Local MCP Server
-  <-> HTTP config + WebSocket commands
+  <-> local WebSocket
 Custom Figma MCP Bridge plugin
   <-> Figma Plugin API
-Live open Figma Desktop file
+Current open Figma Desktop file
 ```
 
-## Protocol Design
+## Server Roles
 
-The shared protocol lives in `shared/src/protocol.ts` and `shared/src/schemas.ts`.
+The MCP server process has two jobs:
 
-Message families:
+1. Speak MCP over stdio to Codex or Claude Code.
+2. Host the local HTTP/WebSocket bridge on `localhost:3333`.
 
-- `HELLO`: plugin announces protocol version, plugin id, file name, and editor type.
-- `PING` / `PONG`: heartbeat and liveness.
-- command messages: server sends a `PluginCommand` and validated payload.
-- result messages: plugin returns structured success or error payloads.
+Only one process can own `localhost:3333`. If the bridge is already running, a new stdio MCP process uses the local `/ws/mcp` proxy instead of opening the port again.
 
-MCP tools map one-to-one to `PluginCommand` values. The MCP server validates every payload with Zod before dispatch.
+This lets Codex and Claude Code start their own MCP stdio processes without breaking the already-running Figma plugin connection.
 
-## Local Authentication
+## Local Endpoints
 
-The server and plugin use a generated local `PLUGIN_AUTH_TOKEN` to reject unrelated WebSocket clients. `./run.sh` creates `.data/plugin-auth-token` automatically.
-
-This token is local machine state. It is not a Figma credential and does not grant access to external files. It only authenticates the desktop plugin connection to the local server.
-
-## Transport
-
-The MCP server uses stdio for the agent connection.
-
-The server also listens on `127.0.0.1:3333` by default:
+Default HTTP endpoints:
 
 - `GET /health`
 - `GET /status`
 - `GET /plugin/config`
-- `ws://localhost:3333/ws/plugin`
 
-The Figma plugin fetches `/plugin/config`, receives the WebSocket URL and local token, then opens the WebSocket connection.
+Default WebSocket endpoints:
+
+- `ws://localhost:3333/ws/plugin` for the Figma Desktop plugin
+- `ws://localhost:3333/ws/mcp` for local MCP proxy processes
+
+The server routes WebSocket upgrades by path so the plugin socket and MCP proxy socket do not conflict.
+
+## Plugin Startup
+
+The Figma plugin fetches:
+
+```text
+http://localhost:3333/plugin/config
+```
+
+The response includes:
+
+- the plugin WebSocket URL
+- the local auth token
+- current connection status
+
+The plugin then opens `/ws/plugin`, sends `HELLO`, and starts heartbeat messages.
+
+## MCP Startup
+
+The MCP entrypoint is:
+
+```bash
+node mcp-server/dist/index.js
+```
+
+Startup behavior:
+
+1. Load local config.
+2. Check whether a compatible bridge already answers `/plugin/config`.
+3. If found, start MCP stdio and forward tool calls through `/ws/mcp`.
+4. If not found, start the HTTP/WebSocket bridge and MCP stdio in the same process.
+
+`./run.sh` is a human-facing helper for install/build/start. It is not the command to put inside Codex or Claude Code MCP config.
+
+## Protocol Design
+
+The shared protocol lives in:
+
+- `shared/src/protocol.ts`
+- `shared/src/schemas.ts`
+
+Message families:
+
+- `HELLO`: plugin or proxy authenticates to the local server.
+- `PING` / `PONG`: heartbeat and liveness.
+- command messages: MCP tools map to local plugin commands.
+- result messages: plugin returns structured success or error payloads.
+
+The MCP server validates payloads with Zod before dispatch.
+
+## Local Authentication
+
+The server creates a local token at:
+
+```text
+.data/plugin-auth-token
+```
+
+The token is used only on this machine to reject unrelated local WebSocket clients. It is not a Figma credential and does not grant access to external Figma files.
 
 ## Plugin Runtime
 
 The plugin has two layers:
 
 - `figma-plugin/src/ui.ts`: connection state, reconnect loop, heartbeat, diagnostics panel.
-- `figma-plugin/src/code.ts`: command execution against the Figma Plugin API.
+- `figma-plugin/src/code.ts`: command execution through the Figma Plugin API.
 
-The UI hides raw diagnostics by default. User-facing states are `Connecting`, `Connected`, `Server offline`, `Reconnecting`, and `Paused`.
+User-facing states are `Connecting`, `Connected`, `Server offline`, `Reconnecting`, and `Paused`.
 
-## MCP Tool Design
+## Tool Categories
 
-Core tool categories:
-
-- document reads: document, current page, selection, node lookup, node search
-- node writes: create, update, move, resize, delete, duplicate
-- assets and metadata: export, local styles, local variables
-- raw local Plugin API: call method, get property, set property
-- events: subscribe, unsubscribe, poll
-- batches: execute ordered operations with rollback
-
-The server exposes only local Plugin API based tools. Canvas mutations are tracked for audit logging.
+- Read document, current page, selection, nodes, styles, and variables.
+- Create frames, text, rectangles, components, and auto-layout frames.
+- Update, move, resize, duplicate, delete, and export nodes.
+- Call selected local Figma Plugin API methods and properties.
+- Subscribe to, unsubscribe from, and poll local plugin events.
+- Run batch operations with rollback.
 
 ## Schema Generation
 
@@ -76,21 +127,14 @@ The server exposes only local Plugin API based tools. Canvas mutations are track
 - `docs/generated/completeness-audit.json`
 - `shared/src/figmaApiSchema.generated.ts`
 
-Generated metadata intentionally omits copied prose documentation and unsupported external-resource surfaces. This keeps the repo focused on the local desktop bridge.
-
-## Batching
-
-`figma.batch_operations` accepts up to 100 operations. By default it is transactional:
-
-- operation results are collected in order
-- created and mutated node ids are tracked
-- a failure triggers undo-backed rollback
-- `continueOnError` can be enabled for non-transactional workflows
-
-## Rollback
-
-Rollback uses Figma undo boundaries from the plugin runtime. When a transactional batch fails, the plugin triggers undo for changes performed in the batch and returns a structured failure result.
+Generated metadata intentionally avoids copied prose documentation and keeps this repo focused on the local desktop bridge.
 
 ## Persistence
 
-The server stores audit logs in SQLite under `.data/figma-mcp.sqlite`. `.data/` is local-only and ignored by git.
+Audit logs are stored in SQLite under:
+
+```text
+.data/figma-mcp.sqlite
+```
+
+`.data/` is local-only and ignored by git.

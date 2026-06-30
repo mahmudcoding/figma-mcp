@@ -1,148 +1,134 @@
 # Custom Figma MCP
 
-Custom Figma MCP is a local bridge that lets AI coding agents inspect and edit the currently open Figma Desktop file. The system is built from a local MCP stdio server, a Figma Desktop development plugin, and a WebSocket connection between them.
+Use Codex or Claude Code to inspect and edit the Figma file that is open in Figma Desktop.
 
-Normal design editing happens inside Figma Desktop through the Figma Plugin API. The AI agent never needs a Figma API credential or external file access for canvas work.
+This is a local tool. It does not use the official Figma MCP, Figma OAuth, Figma API keys, file keys, or Figma web URLs for normal editing.
 
-## Overview
+## Install First
 
-Capabilities:
+### 1. Install Requirements
 
-- Read the open document, current page, selection, and node tree.
-- Create and update frames, text, rectangles, components, variables, styles, and auto-layout nodes.
-- Run batch operations with undo-backed rollback.
-- Call supported local Plugin API surfaces through a typed MCP tool contract.
-- Auto-configure the plugin from the local server at `http://localhost:3333/plugin/config`.
-- Reconnect automatically when the server or plugin restarts.
+- Figma Desktop
+- Node.js 22.5 or newer
+- pnpm 10.25 or newer
 
-## Architecture
+If pnpm is missing, `./run.sh` will try to enable it with Corepack.
 
-Runtime flow:
+### 2. Start This Project
 
-```text
-Codex / Claude Code
-  <-> MCP stdio
-Custom Local MCP Server
-  <-> WebSocket on localhost:3333
-Custom Figma MCP Bridge plugin
-  <-> Figma Plugin API
-Live current open Figma Desktop file
-```
-
-Main pieces:
-
-- `mcp-server`: MCP stdio server, HTTP health/config endpoint, WebSocket hub, command dispatcher, audit logging.
-- `figma-plugin`: Figma Desktop plugin UI and Plugin API executor.
-- `shared`: protocol constants, Zod schemas, generated Plugin API metadata, shared error types.
-- `scripts`: setup, start, doctor, schema generation, and plugin helper scripts.
-
-The server exposes:
-
-- `GET /health`
-- `GET /status`
-- `GET /plugin/config`
-- `ws://localhost:3333/ws/plugin`
-
-## Setup
-
-Prerequisites:
-
-- Figma Desktop installed and logged in.
-- Node.js 22.5+ (22, 24, 26+ supported unless proven otherwise). The server uses `node:sqlite`.
-- `pnpm` 10.25 or newer. `./run.sh` can enable it through Corepack when available.
-
-Fresh clone:
+Open Terminal:
 
 ```bash
-git clone <repo-url>
-cd figma-mcp
+cd /path/to/figma-mcp
 ./run.sh
 ```
 
-`./run.sh` detects the OS, validates Node and pnpm, installs dependencies, creates local config, builds the server/plugin, checks health, and starts the local MCP server.
+Keep this Terminal window open while you use Figma MCP.
 
-Import the plugin once:
+### 3. Add The Figma Plugin Once
 
 1. Open Figma Desktop.
 2. Go to `Plugins -> Development -> Import plugin from manifest...`.
-3. Select `figma-plugin/manifest.json`.
+3. Select `figma-plugin/manifest.json` from this project.
 4. Run `Plugins -> Development -> Custom Figma MCP Bridge`.
 
-Configure your agent:
+The plugin should show `Connected`.
 
-- Codex: see [docs/codex-setup.md](docs/codex-setup.md).
-- Claude Code: see [docs/claude-code-setup.md](docs/claude-code-setup.md).
+### 4. Connect Your AI Tool
 
-## Usage
+For Codex:
 
-Daily flow:
+```bash
+codex mcp add custom-figma-mcp -- /bin/zsh -lc 'cd /path/to/figma-mcp && node mcp-server/dist/index.js'
+```
 
-1. Open the target file in Figma Desktop.
-2. Start this repo with `./run.sh`.
-3. Run `Custom Figma MCP Bridge` from Figma Desktop.
-4. Start Codex or Claude Code with the configured MCP server.
-5. Ask the agent to inspect or edit the current open file.
+For Claude Code:
 
-Verify connection:
+```bash
+claude mcp add --transport stdio custom-figma-mcp -- /bin/zsh -lc 'cd /path/to/figma-mcp && node mcp-server/dist/index.js'
+```
+
+Use the real full path to this folder.
+
+After adding it, restart Codex or Claude Code.
+
+## Daily Use
+
+1. Open the Figma file in Figma Desktop.
+2. In Terminal, run:
+
+```bash
+cd /path/to/figma-mcp
+./run.sh
+```
+
+3. In Figma Desktop, run `Plugins -> Development -> Custom Figma MCP Bridge`.
+4. Start Codex or Claude Code.
+5. Ask it to inspect or edit the open Figma file.
+
+## Check That It Works
+
+Run:
 
 ```bash
 curl http://localhost:3333/health
-pnpm doctor
 ```
 
-Healthy output includes `ok: true`. When the plugin is running, `pluginConnected` is `true`.
+Good result:
 
-## Project Structure
+```json
+{
+  "ok": true,
+  "pluginConnected": true
+}
+```
+
+If `pluginConnected` is `false`, open Figma Desktop, open your file, and run `Plugins -> Development -> Custom Figma MCP Bridge`.
+
+## What This Does
+
+This project creates a local bridge:
 
 ```text
-figma-plugin/          Figma Desktop plugin source, manifest, and build script
-mcp-server/            Local MCP stdio server, WebSocket hub, HTTP health/config
-shared/                Shared protocol, schemas, generated Plugin API metadata
-scripts/               Setup, start, doctor, schema generation, plugin info
-tests/integration/     Live runtime integration tests against Figma Desktop
-docs/                  Architecture, setup guides, production checklist
-run.sh                 Primary one-command setup/start entrypoint
+Codex / Claude Code
+  -> local MCP server
+  -> local WebSocket
+  -> Figma Desktop plugin
+  -> your open Figma file
 ```
 
-Ignored local state:
+The AI tool can read and edit the file that is currently open in Figma Desktop.
 
-- `.env`
-- `.data/`
-- `node_modules/`
-- `dist/`
-- `coverage/`
-- logs, caches, and TypeScript build info
+It can create and update frames, text, rectangles, components, auto-layout frames, styles, variables, and other supported Figma Plugin API objects.
 
-## Troubleshooting
+## Common Problems
 
-Plugin not connected:
+### The Plugin Says Reconnecting
 
-- Open Figma Desktop.
-- Open the target file.
-- Run `Plugins -> Development -> Custom Figma MCP Bridge`.
-- Check `curl http://localhost:3333/health`.
+1. Make sure `./run.sh` is still running.
+2. Click `Reconnect` in the plugin.
+3. If it still fails, close and run the plugin again from `Plugins -> Development`.
 
-Localhost unreachable:
+### The Health Check Says pluginConnected false
 
-- Start the server with `./run.sh`.
-- Make sure port `3333` is free.
-- Check `HOST` and `PORT` in `.env`.
+The local server is running, but Figma Desktop is not connected.
 
-WebSocket failure:
+Open Figma Desktop, open the target file, and run `Custom Figma MCP Bridge`.
 
-- Keep `./run.sh` running.
-- Click `Reconnect` in the plugin.
-- Open `Diagnostics` only if you need logs.
-- Restart the plugin after rebuilding plugin code.
+### Codex Or Claude Does Not Show The Tools
 
-Plugin config failure:
+Restart Codex or Claude Code after adding the MCP server.
 
-- Confirm `http://localhost:3333/plugin/config` returns `ok: true`.
-- Confirm `figma-plugin/manifest.json` allows `http://localhost:3333` and `ws://localhost:3333`.
+In Codex or Claude Code, run `/mcp` and look for `custom-figma-mcp`.
 
-## Development
+## More Help
 
-Common commands:
+- Codex setup: [docs/codex-setup.md](docs/codex-setup.md)
+- Claude Code setup: [docs/claude-code-setup.md](docs/claude-code-setup.md)
+- Figma plugin setup: [docs/figma-setup.md](docs/figma-setup.md)
+- Architecture details: [docs/architecture.md](docs/architecture.md)
+
+## Developer Commands
 
 ```bash
 pnpm install
@@ -152,5 +138,3 @@ pnpm doctor
 pnpm test:integration
 ./run.sh --check
 ```
-
-Extend the system by adding or updating shared command schemas in `shared/src/schemas.ts`, implementing Plugin API behavior in `figma-plugin/src/code.ts`, and exposing MCP metadata in `mcp-server/src/mcp.ts`. Keep the MCP server local and keep design edits routed through the Figma Desktop plugin.
