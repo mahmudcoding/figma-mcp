@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Custom Figma MCP</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, Arial, sans-serif;
+        font-size: 12px;
+      }
+
+      body {
+        margin: 0;
+        padding: 18px;
+        background: var(--figma-color-bg);
+        color: var(--figma-color-text);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 700;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .status-card {
+        margin-top: 16px;
+        padding: 14px;
+        border: 1px solid var(--figma-color-border);
+        border-radius: 8px;
+        background: var(--figma-color-bg-secondary);
+      }
+
+      .status-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        background: var(--figma-color-icon-secondary);
+      }
+
+      .status-dot.connected {
+        background: var(--figma-color-icon-success);
+      }
+
+      .status-dot.connecting,
+      .status-dot.reconnecting {
+        background: var(--figma-color-icon-warning);
+      }
+
+      .status-dot.paused,
+      .status-dot.offline,
+      .status-dot.idle {
+        background: var(--figma-color-icon-secondary);
+      }
+
+      .status-title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .status-detail {
+        margin-top: 8px;
+        color: var(--figma-color-text-secondary);
+        line-height: 1.4;
+      }
+
+      .meta {
+        display: grid;
+        grid-template-columns: 76px 1fr;
+        row-gap: 8px;
+        column-gap: 10px;
+        margin-top: 16px;
+      }
+
+      .label {
+        color: var(--figma-color-text-secondary);
+      }
+
+      .value {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-weight: 550;
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 16px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        padding: 9px 10px;
+        background: var(--figma-color-bg-brand);
+        color: var(--figma-color-text-onbrand);
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: var(--figma-color-bg-secondary);
+        color: var(--figma-color-text);
+        border: 1px solid var(--figma-color-border);
+      }
+
+      .diagnostics {
+        margin-top: 14px;
+        border-top: 1px solid var(--figma-color-border);
+        padding-top: 14px;
+      }
+
+      .diagnostics[hidden] {
+        display: none;
+      }
+
+      label {
+        display: block;
+        margin: 10px 0 6px;
+        font-weight: 600;
+      }
+
+      input {
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid var(--figma-color-border);
+        border-radius: 6px;
+        padding: 8px;
+        background: var(--figma-color-bg);
+        color: var(--figma-color-text);
+        font: inherit;
+      }
+
+      .log {
+        box-sizing: border-box;
+        margin-top: 12px;
+        height: 142px;
+        overflow: auto;
+        padding: 10px;
+        border: 1px solid var(--figma-color-border);
+        border-radius: 6px;
+        background: var(--figma-color-bg);
+        color: var(--figma-color-text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.4;
+      }
+
+      .diagnostics-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .diagnostics-actions button {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Custom Figma MCP</h1>
+      <button id="diagnosticsToggle" class="secondary">Diagnostics</button>
+    </div>
+
+    <section class="status-card">
+      <div class="status-row">
+        <span id="statusDot" class="status-dot idle"></span>
+        <div id="statusText" class="status-title">Connecting</div>
+      </div>
+      <div id="statusDetail" class="status-detail">Looking for the local MCP server...</div>
+
+      <div class="meta">
+        <div class="label">File</div>
+        <div id="fileName" class="value">Open Figma file</div>
+        <div class="label">Page</div>
+        <div id="pageName" class="value">Current page unavailable</div>
+        <div class="label">Server</div>
+        <div id="serverName" class="value">Local MCP</div>
+      </div>
+
+      <div class="actions">
+        <button id="reconnect">Reconnect</button>
+        <button id="pause" class="secondary">Pause</button>
+      </div>
+    </section>
+
+    <section id="diagnosticsPanel" class="diagnostics" hidden>
+      <div id="heartbeat" class="status-detail">Last heartbeat: pending</div>
+
+      <label for="configUrl">Config endpoint</label>
+      <input id="configUrl" value="http://localhost:3333/plugin/config" />
+
+      <label for="serverUrl">WebSocket URL</label>
+      <input id="serverUrl" value="ws://localhost:3333/ws/plugin" />
+
+      <label for="authToken">Plugin auth token</label>
+      <input id="authToken" type="password" />
+
+      <div id="log" class="log"></div>
+    </section>
+
+    <!-- UI_SCRIPT -->
+  </body>
+</html>

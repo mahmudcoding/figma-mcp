@@ -1,0 +1,21 @@
+{
+  "name": "Custom Figma MCP Bridge",
+  "id": "custom-figma-mcp-bridge",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/ui.html",
+  "editorType": ["figma", "figjam", "dev", "slides", "buzz"],
+  "documentAccess": "dynamic-page",
+  "permissions": ["teamlibrary"],
+  "networkAccess": {
+    "allowedDomains": [
+      "http://localhost:3333",
+      "ws://localhost:3333"
+    ],
+    "devAllowedDomains": [
+      "http://localhost:3333",
+      "ws://localhost:3333"
+    ],
+    "reasoning": "The plugin connects to the locally running custom MCP WebSocket server."
+  }
+}

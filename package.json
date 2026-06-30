@@ -1,0 +1,32 @@
+{
+  "name": "custom-figma-mcp-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local MCP server and Figma plugin bridge for high-control Figma canvas automation.",
+  "packageManager": "pnpm@10.25.0",
+  "type": "module",
+  "scripts": {
+    "build": "pnpm schema:generate && pnpm -r build",
+    "bootstrap": "node scripts/setup.mjs",
+    "clean": "pnpm -r clean",
+    "dev": "pnpm --filter @custom-figma-mcp/mcp-server dev",
+    "doctor": "node scripts/doctor.mjs",
+    "lint": "pnpm -r typecheck",
+    "mcp": "pnpm --filter @custom-figma-mcp/mcp-server start",
+    "plugin:info": "node scripts/plugin-info.mjs",
+    "schema:generate": "node scripts/generate-figma-api-schema.mjs",
+    "setup": "node scripts/setup.mjs",
+    "sources:fetch": "mkdir -p docs/source-snapshots && curl -fsSL https://raw.githubusercontent.com/figma/plugin-typings/master/plugin-api.d.ts -o docs/source-snapshots/plugin-api.d.ts && curl -fsSL https://raw.githubusercontent.com/figma/rest-api-spec/main/openapi/openapi.yaml -o docs/source-snapshots/rest-openapi.yaml",
+    "start": "node scripts/start.mjs",
+    "test:integration": "pnpm build && node --test tests/integration/*.test.mjs",
+    "typecheck": "pnpm schema:generate && pnpm --filter @custom-figma-mcp/shared build && pnpm -r typecheck",
+    "server": "pnpm --filter @custom-figma-mcp/mcp-server start",
+    "plugin:build": "pnpm --filter @custom-figma-mcp/figma-plugin build"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@types/node": "^26.0.1",
+    "typescript": "^5.9.3",
+    "yaml": "^2.8.2"
+  }
+}

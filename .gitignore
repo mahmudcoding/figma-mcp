@@ -1,0 +1,12 @@
+.DS_Store
+node_modules/
+dist/
+.data/
+.env
+*.log
+*.tsbuildinfo
+coverage/
+docs/generated/
+docs/source-snapshots/html/
+.turbo/
+.pnpm-store/
